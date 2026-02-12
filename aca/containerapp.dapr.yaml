@@ -1,0 +1,29 @@
+﻿name: dapr-aca-starter
+location: eastus
+type: Microsoft.App/containerApps
+properties:
+  managedEnvironmentId: /subscriptions/<SUBSCRIPTION_ID>/resourceGroups/<RESOURCE_GROUP>/providers/Microsoft.App/managedEnvironments/<ACA_ENV_NAME>
+  configuration:
+    ingress:
+      external: true
+      targetPort: 8080
+      transport: auto
+    dapr:
+      enabled: true
+      appId: dapr-aca-starter
+      appPort: 8080
+      appProtocol: http
+      enableApiLogging: true
+  template:
+    containers:
+    - name: dapr-aca-starter
+      image: <ACR_LOGIN_SERVER>/dapr-aca-starter:latest
+      resources:
+        cpu: 0.5
+        memory: 1Gi
+      env:
+      - name: ASPNETCORE_ENVIRONMENT
+        value: Production
+    scale:
+      minReplicas: 1
+      maxReplicas: 3

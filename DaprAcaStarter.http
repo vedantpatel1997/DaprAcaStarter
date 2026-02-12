@@ -1,0 +1,24 @@
+﻿@DaprAcaStarter_HostAddress = http://localhost:8080
+
+### Health
+GET {{DaprAcaStarter_HostAddress}}/healthz
+Accept: application/json
+
+### Create Order
+POST {{DaprAcaStarter_HostAddress}}/orders
+Content-Type: application/json
+
+{
+  "customerId": "cust-101",
+  "product": "Laptop Stand",
+  "quantity": 2,
+  "unitPrice": 39.99
+}
+
+### Invoke Self Through Dapr
+POST {{DaprAcaStarter_HostAddress}}/invoke/self
+Content-Type: application/json
+
+{
+  "message": "hello via dapr invocation"
+}
