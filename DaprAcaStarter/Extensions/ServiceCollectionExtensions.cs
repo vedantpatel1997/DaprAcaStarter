@@ -28,8 +28,7 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddScoped<IAppInfoService, AppInfoService>();
-        services.AddScoped<IOrderService, OrderService>();
-        services.AddScoped<IInvocationService, InvocationService>();
+        services.AddScoped<IStorefrontService, StorefrontService>();
 
         return services;
     }

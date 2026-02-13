@@ -17,4 +17,13 @@ public sealed class DaprOptions
 
     [Required]
     public string OrdersTopic { get; set; } = DaprDefaults.OrdersTopic;
+
+    [Required]
+    public string ProductsAppId { get; set; } = DaprDefaults.ProductsAppId;
+
+    [Required]
+    public string CartAppId { get; set; } = DaprDefaults.CartAppId;
+
+    [Required]
+    public string CheckoutAppId { get; set; } = DaprDefaults.CheckoutAppId;
 }

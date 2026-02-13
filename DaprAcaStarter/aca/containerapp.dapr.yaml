@@ -1,4 +1,4 @@
-﻿name: dapr-aca-starter
+name: storefront-api
 location: eastus
 type: Microsoft.App/containerApps
 properties:
@@ -10,20 +10,34 @@ properties:
       transport: auto
     dapr:
       enabled: true
-      appId: dapr-aca-starter
+      appId: storefront-api
       appPort: 8080
       appProtocol: http
       enableApiLogging: true
   template:
     containers:
-    - name: dapr-aca-starter
-      image: <ACR_LOGIN_SERVER>/dapr-aca-starter:latest
+    - name: storefront-api
+      image: <ACR_LOGIN_SERVER>/storefront-api:latest
       resources:
         cpu: 0.5
         memory: 1Gi
       env:
       - name: ASPNETCORE_ENVIRONMENT
         value: Production
+      - name: Dapr__AppId
+        value: storefront-api
+      - name: Dapr__StateStoreName
+        value: statestore
+      - name: Dapr__PubSubName
+        value: pubsub
+      - name: Dapr__OrdersTopic
+        value: checkout.completed.v1
+      - name: Dapr__ProductsAppId
+        value: products-service
+      - name: Dapr__CartAppId
+        value: cart-service
+      - name: Dapr__CheckoutAppId
+        value: checkout-service
     scale:
       minReplicas: 1
       maxReplicas: 3

@@ -6,6 +6,12 @@ export interface ServiceInfo {
     pubsub: string;
     topic: string;
   };
+  services: {
+    productsAppId: string;
+    cartAppId: string;
+    checkoutAppId: string;
+  };
+  workflow: string[];
 }
 
 export interface HealthResponse {
@@ -13,28 +19,40 @@ export interface HealthResponse {
   utc: string;
 }
 
-export interface CreateOrderRequest {
-  customerId: string;
-  product: string;
-  quantity: number;
-  unitPrice: number;
+export interface Product {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  description: string;
 }
 
-export interface Order {
-  id: string;
-  customerId: string;
-  product: string;
-  quantity: number;
+export interface CartItem {
+  productId: string;
+  productName: string;
   unitPrice: number;
-  createdUtc: string;
+  quantity: number;
+  lineTotal: number;
+}
+
+export interface Cart {
+  customerId: string;
+  items: CartItem[];
   total: number;
 }
 
-export interface PublishOrderEventRequest {
-  orderId: string;
-  status: string;
+export interface AddCartItemRequest {
+  productId: string;
+  productName: string;
+  unitPrice: number;
+  quantity: number;
 }
 
-export interface InvocationRequest {
-  message: string;
+export interface CheckoutOrder {
+  orderId: string;
+  customerId: string;
+  items: CartItem[];
+  total: number;
+  checkedOutUtc: string;
+  status: string;
 }

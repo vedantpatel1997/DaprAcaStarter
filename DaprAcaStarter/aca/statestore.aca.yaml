@@ -6,4 +6,6 @@ metadata:
 - name: actorStateStore
   value: "false"
 scopes:
-- dapr-aca-starter
+- storefront-api
+- cart-service
+- checkout-service

@@ -1,111 +1,82 @@
-﻿<main class="page">
+<main class="page">
   <section class="hero">
     <p class="badge">Angular 21 + Dapr + ACA</p>
-    <h1>Dapr Operations Console</h1>
+    <h1>Storefront Microservices Console</h1>
     <p>
-      This UI calls your backend endpoints directly and helps you understand how
-      state store, pub/sub, and service invocation behave together in one flow.
+      Workflow: frontend calls <code>storefront-api</code>, which invokes
+      <code>products-service</code>, <code>cart-service</code>, and <code>checkout-service</code>
+      through Dapr app IDs.
     </p>
   </section>
 
   <section class="panel">
     <h2>Connection</h2>
-    <p class="panel-copy">
-      Point the frontend to your backend base URL. For local run, keep
-      <code>http://localhost:8080</code>.
-    </p>
     <div class="grid">
       <label class="field field-wide">
-        <span>Backend URL</span>
+        <span>Storefront API URL</span>
         <input [formControl]="apiBaseUrl" placeholder="http://localhost:8080" />
       </label>
       <button type="button" (click)="onApplyApiBaseUrl()">Apply</button>
-      <button type="button" (click)="onLoadServiceInfo()">Load Service Info</button>
-      <button type="button" (click)="onHealthCheck()">Health Check</button>
+      <button type="button" (click)="onLoadOverview()">Load Metadata</button>
+      <button type="button" (click)="onLoadProducts()">Load Products</button>
     </div>
     <p class="status">{{ message() }}</p>
   </section>
 
   <section class="panel">
-    <h2>Dapr Flow Explorer</h2>
-    <div class="steps">
-      <article>
-        <h3>1. State Store</h3>
-        <p><code>POST /orders</code> saves an order to <code>statestore</code>.</p>
-      </article>
-      <article>
-        <h3>2. Pub/Sub</h3>
-        <p>The same call also publishes to topic <code>orders.v1</code> on <code>pubsub</code>.</p>
-      </article>
-      <article>
-        <h3>3. Subscription</h3>
-        <p>Dapr delivers events to backend endpoint <code>/dapr/orders-subscription</code>.</p>
-      </article>
-      <article>
-        <h3>4. Invocation</h3>
-        <p><code>POST /invoke/self</code> shows service-to-service call through Dapr app ID.</p>
-      </article>
+    <h2>Shop Session</h2>
+    <div class="grid">
+      <label class="field field-wide">
+        <span>Customer ID</span>
+        <input [formControl]="customerId" placeholder="cust-101" />
+      </label>
+      <button type="button" (click)="onLoadCart()" [disabled]="loading()">Load Cart</button>
+      <button type="button" (click)="onCheckout()" [disabled]="loading()">Checkout</button>
+      <button type="button" (click)="onLoadOrder()" [disabled]="loading()">Load Last Order</button>
     </div>
   </section>
 
   <section class="panel">
-    <h2>Create Order</h2>
-    <form [formGroup]="createOrderForm" class="grid">
-      <label class="field">
-        <span>Customer ID</span>
-        <input formControlName="customerId" />
-      </label>
-      <label class="field">
+    <h2>Add To Cart</h2>
+    <form [formGroup]="addToCartForm" class="grid">
+      <label class="field field-wide">
         <span>Product</span>
-        <input formControlName="product" />
+        <select formControlName="productId">
+          @for (product of products(); track product.id) {
+            <option [value]="product.id">{{ product.name }} ({{ product.currency }} {{ product.price }})</option>
+          }
+        </select>
       </label>
       <label class="field">
         <span>Quantity</span>
-        <input type="number" min="1" formControlName="quantity" />
+        <input type="number" min="1" max="25" formControlName="quantity" />
       </label>
-      <label class="field">
-        <span>Unit Price</span>
-        <input type="number" step="0.01" min="0.01" formControlName="unitPrice" />
-      </label>
-      <button type="button" (click)="onCreateOrder()" [disabled]="loading()">Create + Publish</button>
+      <button type="button" (click)="onAddToCart()" [disabled]="loading() || products().length === 0">
+        Add To Cart
+      </button>
     </form>
   </section>
 
   <section class="panel">
-    <h2>Read Order From State Store</h2>
-    <form [formGroup]="getOrderForm" class="grid">
-      <label class="field field-wide">
-        <span>Order ID</span>
-        <input formControlName="orderId" placeholder="Paste order id from create step" />
-      </label>
-      <button type="button" (click)="onGetOrder()" [disabled]="loading()">Fetch Order</button>
-    </form>
-  </section>
-
-  <section class="panel">
-    <h2>Manual Pub/Sub Event</h2>
-    <form [formGroup]="publishOrderForm" class="grid">
-      <label class="field">
-        <span>Order ID</span>
-        <input formControlName="orderId" />
-      </label>
-      <label class="field">
-        <span>Status</span>
-        <input formControlName="status" />
-      </label>
-      <button type="button" (click)="onPublishEvent()" [disabled]="loading()">Publish Event</button>
-    </form>
-  </section>
-
-  <section class="panel">
-    <h2>Dapr Service Invocation</h2>
-    <form [formGroup]="invokeForm" class="grid">
-      <label class="field field-wide">
-        <span>Message</span>
-        <input formControlName="message" />
-      </label>
-      <button type="button" (click)="onInvokeSelf()" [disabled]="loading()">Invoke Self</button>
-    </form>
+    <h2>Dapr Workflow</h2>
+    <div class="steps">
+      <article>
+        <h3>1. Service Invocation</h3>
+        <p><code>storefront-api -> products-service/cart-service/checkout-service</code></p>
+      </article>
+      <article>
+        <h3>2. State Store</h3>
+        <p><code>cart-service</code> and <code>checkout-service</code> persist to <code>statestore</code>.</p>
+      </article>
+      <article>
+        <h3>3. Pub/Sub Event</h3>
+        <p><code>checkout-service</code> publishes <code>checkout.completed.v1</code> on <code>pubsub</code>.</p>
+      </article>
+      <article>
+        <h3>4. Subscriber</h3>
+        <p><code>cart-service</code> subscription receives event and clears cart asynchronously.</p>
+      </article>
+    </div>
   </section>
 
   <section class="panel">
@@ -118,10 +89,12 @@
         <pre>{{ healthInfo() | json }}</pre>
       </article>
       <article>
-        <h3>Selected Order</h3>
-        <pre>{{ selectedOrder() | json }}</pre>
-        <h3>Invocation Result</h3>
-        <pre>{{ invokeResult() | json }}</pre>
+        <h3>Products</h3>
+        <pre>{{ products() | json }}</pre>
+        <h3>Cart</h3>
+        <pre>{{ cart() | json }}</pre>
+        <h3>Latest Order</h3>
+        <pre>{{ latestOrder() | json }}</pre>
       </article>
     </div>
   </section>

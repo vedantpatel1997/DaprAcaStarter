@@ -2,11 +2,11 @@ import { inject, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import {
-  CreateOrderRequest,
+  AddCartItemRequest,
+  Cart,
+  CheckoutOrder,
   HealthResponse,
-  InvocationRequest,
-  Order,
-  PublishOrderEventRequest,
+  Product,
   ServiceInfo
 } from './models';
 
@@ -14,7 +14,7 @@ import {
 export class DaprApiService {
   private readonly http = inject(HttpClient);
   private readonly defaultBaseUrl =
-    'https://ca-dapr-aca-backend.blackocean-54455b91.westus2.azurecontainerapps.io';
+    'https://storefront-api.blackocean-54455b91.westus2.azurecontainerapps.io';
   private readonly baseUrl = signal(this.defaultBaseUrl);
 
   get apiBaseUrl(): string {
@@ -34,20 +34,24 @@ export class DaprApiService {
     return this.http.get<HealthResponse>(this.url('/healthz'));
   }
 
-  createOrder(payload: CreateOrderRequest): Observable<Order> {
-    return this.http.post<Order>(this.url('/orders'), payload);
+  getProducts(): Observable<Product[]> {
+    return this.http.get<Product[]>(this.url('/api/products'));
   }
 
-  getOrder(orderId: string): Observable<Order> {
-    return this.http.get<Order>(this.url(`/orders/${encodeURIComponent(orderId)}`));
+  getCart(customerId: string): Observable<Cart> {
+    return this.http.get<Cart>(this.url(`/api/cart/${encodeURIComponent(customerId)}`));
   }
 
-  publishOrderEvent(payload: PublishOrderEventRequest): Observable<void> {
-    return this.http.post<void>(this.url('/publish/orders'), payload);
+  addCartItem(customerId: string, payload: AddCartItemRequest): Observable<Cart> {
+    return this.http.post<Cart>(this.url(`/api/cart/${encodeURIComponent(customerId)}/items`), payload);
   }
 
-  invokeSelf(payload: InvocationRequest): Observable<object> {
-    return this.http.post<object>(this.url('/invoke/self'), payload);
+  checkout(customerId: string): Observable<CheckoutOrder> {
+    return this.http.post<CheckoutOrder>(this.url(`/api/checkout/${encodeURIComponent(customerId)}`), {});
+  }
+
+  getOrder(orderId: string): Observable<CheckoutOrder> {
+    return this.http.get<CheckoutOrder>(this.url(`/api/orders/${encodeURIComponent(orderId)}`));
   }
 
   private url(path: string): string {

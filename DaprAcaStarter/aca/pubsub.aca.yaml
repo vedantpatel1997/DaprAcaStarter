@@ -4,4 +4,6 @@ metadata:
 - name: redisHost
   value: ca-dapr-aca-redis:6379
 scopes:
-- dapr-aca-starter
+- storefront-api
+- cart-service
+- checkout-service

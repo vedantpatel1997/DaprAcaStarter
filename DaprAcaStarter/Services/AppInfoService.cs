@@ -12,9 +12,17 @@ public sealed class AppInfoService(IOptions<DaprOptions> options) : IAppInfoServ
     public ServiceInfoResponse GetServiceInfo()
     {
         return new ServiceInfoResponse(
-            "Dapr ACA Starter is running",
+            "Storefront API is running",
             _daprOptions.AppId,
-            new DaprServiceInfo(_daprOptions.StateStoreName, _daprOptions.PubSubName, _daprOptions.OrdersTopic));
+            new DaprServiceInfo(_daprOptions.StateStoreName, _daprOptions.PubSubName, _daprOptions.OrdersTopic),
+            new DownstreamServices(_daprOptions.ProductsAppId, _daprOptions.CartAppId, _daprOptions.CheckoutAppId),
+            [
+                "Frontend calls Storefront API",
+                "Storefront invokes products/cart/checkout by Dapr app-id",
+                "Cart state is stored in statestore",
+                "Checkout publishes checkout.completed.v1 to pubsub",
+                "Cart service subscribes and clears cart"
+            ]);
     }
 
     public HealthResponse GetHealth()

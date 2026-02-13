@@ -3,7 +3,7 @@ import { CommonModule } from '@angular/common';
 import { Component, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { DaprApiService } from './dapr-api.service';
-import { HealthResponse, Order, ServiceInfo } from './models';
+import { Cart, CheckoutOrder, HealthResponse, Product, ServiceInfo } from './models';
 
 @Component({
   selector: 'app-root',
@@ -17,31 +17,18 @@ export class App {
 
   readonly apiBaseUrl = this.fb.nonNullable.control(this.api.apiBaseUrl, [Validators.required]);
 
-  readonly createOrderForm = this.fb.nonNullable.group({
-    customerId: ['cust-101', Validators.required],
-    product: ['Laptop Stand', Validators.required],
-    quantity: [2, [Validators.required, Validators.min(1)]],
-    unitPrice: [39.99, [Validators.required, Validators.min(0.01)]]
-  });
-
-  readonly getOrderForm = this.fb.nonNullable.group({
-    orderId: ['', Validators.required]
-  });
-
-  readonly publishOrderForm = this.fb.nonNullable.group({
-    orderId: ['', Validators.required],
-    status: ['Shipped', Validators.required]
-  });
-
-  readonly invokeForm = this.fb.nonNullable.group({
-    message: ['hello via dapr invocation', Validators.required]
+  readonly customerId = this.fb.nonNullable.control('cust-101', [Validators.required]);
+  readonly addToCartForm = this.fb.nonNullable.group({
+    productId: ['P-100', Validators.required],
+    quantity: [1, [Validators.required, Validators.min(1), Validators.max(25)]]
   });
 
   readonly loading = signal(false);
   readonly serviceInfo = signal<ServiceInfo | null>(null);
   readonly healthInfo = signal<HealthResponse | null>(null);
-  readonly selectedOrder = signal<Order | null>(null);
-  readonly invokeResult = signal<unknown | null>(null);
+  readonly products = signal<Product[]>([]);
+  readonly cart = signal<Cart | null>(null);
+  readonly latestOrder = signal<CheckoutOrder | null>(null);
   readonly message = signal<string>('Ready');
   readonly activity = signal<string[]>([]);
 
@@ -55,104 +42,134 @@ export class App {
     this.log(`API base URL changed to ${this.api.apiBaseUrl}`);
   }
 
-  onLoadServiceInfo(): void {
+  onLoadOverview(): void {
     this.loading.set(true);
-    this.api.getServiceInfo().subscribe({
-      next: (result) => {
-        this.serviceInfo.set(result);
-        this.message.set('Service info loaded.');
-        this.log(`Loaded root metadata. appId=${result.appId}`);
-      },
-      error: (error) => this.handleError('Failed to load service info.', error),
-      complete: () => this.loading.set(false)
-    });
-  }
 
-  onHealthCheck(): void {
-    this.loading.set(true);
+    this.api.getServiceInfo().subscribe({
+      next: (info) => {
+        this.serviceInfo.set(info);
+        this.log(`Storefront appId=${info.appId} routes to ${info.services.productsAppId}, ${info.services.cartAppId}, ${info.services.checkoutAppId}`);
+      },
+      error: (error) => this.handleError('Failed to load service info.', error)
+    });
+
     this.api.getHealth().subscribe({
-      next: (result) => {
-        this.healthInfo.set(result);
-        this.message.set('Health check successful.');
-        this.log(`Health is ${result.status} at ${result.utc}`);
+      next: (health) => {
+        this.healthInfo.set(health);
+        this.message.set('Storefront metadata and health loaded.');
       },
       error: (error) => this.handleError('Health check failed.', error),
       complete: () => this.loading.set(false)
     });
   }
 
-  onCreateOrder(): void {
-    if (this.createOrderForm.invalid) {
-      this.message.set('Create Order form is invalid.');
-      return;
-    }
-
+  onLoadProducts(): void {
     this.loading.set(true);
-    this.api.createOrder(this.createOrderForm.getRawValue()).subscribe({
-      next: (order) => {
-        this.selectedOrder.set(order);
-        this.getOrderForm.patchValue({ orderId: order.id });
-        this.publishOrderForm.patchValue({ orderId: order.id });
-        this.message.set(`Order created: ${order.id}`);
-        this.log(`Created order ${order.id}, saved to state store and published to topic.`);
+    this.api.getProducts().subscribe({
+      next: (products) => {
+        this.products.set(products);
+        if (products.length > 0 && !products.some((p) => p.id === this.addToCartForm.getRawValue().productId)) {
+          this.addToCartForm.patchValue({ productId: products[0].id });
+        }
+
+        this.message.set(`Loaded ${products.length} products.`);
+        this.log('Storefront invoked products-service via Dapr service invocation.');
       },
-      error: (error) => this.handleError('Failed to create order.', error),
+      error: (error) => this.handleError('Failed to load products.', error),
       complete: () => this.loading.set(false)
     });
   }
 
-  onGetOrder(): void {
-    if (this.getOrderForm.invalid) {
-      this.message.set('Enter a valid order ID.');
+  onLoadCart(): void {
+    if (this.customerId.invalid) {
+      this.message.set('Customer ID is required.');
+      return;
+    }
+
+    const customerId = this.customerId.getRawValue();
+    this.loading.set(true);
+
+    this.api.getCart(customerId).subscribe({
+      next: (cart) => {
+        this.cart.set(cart);
+        this.message.set(`Cart loaded for ${customerId}.`);
+        this.log('Storefront invoked cart-service and read cart state from statestore.');
+      },
+      error: (error) => this.handleError('Failed to load cart.', error),
+      complete: () => this.loading.set(false)
+    });
+  }
+
+  onAddToCart(): void {
+    if (this.customerId.invalid || this.addToCartForm.invalid) {
+      this.message.set('Customer and add-to-cart form must be valid.');
+      return;
+    }
+
+    const customerId = this.customerId.getRawValue();
+    const form = this.addToCartForm.getRawValue();
+    const product = this.products().find((p) => p.id === form.productId);
+
+    if (!product) {
+      this.message.set('Choose a valid product first.');
       return;
     }
 
     this.loading.set(true);
-    const orderId = this.getOrderForm.getRawValue().orderId;
+    this.api
+      .addCartItem(customerId, {
+        productId: product.id,
+        productName: product.name,
+        unitPrice: product.price,
+        quantity: form.quantity
+      })
+      .subscribe({
+        next: (cart) => {
+          this.cart.set(cart);
+          this.message.set(`Added ${form.quantity} x ${product.name} to cart.`);
+          this.log('cart-service updated cart in statestore through Dapr state API.');
+        },
+        error: (error) => this.handleError('Failed to add product to cart.', error),
+        complete: () => this.loading.set(false)
+      });
+  }
+
+  onCheckout(): void {
+    if (this.customerId.invalid) {
+      this.message.set('Customer ID is required.');
+      return;
+    }
+
+    const customerId = this.customerId.getRawValue();
+    this.loading.set(true);
+
+    this.api.checkout(customerId).subscribe({
+      next: (order) => {
+        this.latestOrder.set(order);
+        this.cart.set({ customerId, items: [], total: 0 });
+        this.message.set(`Checkout complete: ${order.orderId}`);
+        this.log('checkout-service saved order, published checkout.completed.v1, and cart-service subscription cleared cart.');
+      },
+      error: (error) => this.handleError('Checkout failed.', error),
+      complete: () => this.loading.set(false)
+    });
+  }
+
+  onLoadOrder(): void {
+    const orderId = this.latestOrder()?.orderId;
+    if (!orderId) {
+      this.message.set('Run checkout first to query an order.');
+      return;
+    }
+
+    this.loading.set(true);
     this.api.getOrder(orderId).subscribe({
       next: (order) => {
-        this.selectedOrder.set(order);
-        this.message.set(`Order loaded: ${order.id}`);
-        this.log(`Read order ${order.id} from statestore.`);
+        this.latestOrder.set(order);
+        this.message.set(`Order ${order.orderId} loaded.`);
+        this.log('Storefront invoked checkout-service to read order state.');
       },
-      error: (error) => this.handleError(`Failed to load order ${orderId}.`, error),
-      complete: () => this.loading.set(false)
-    });
-  }
-
-  onPublishEvent(): void {
-    if (this.publishOrderForm.invalid) {
-      this.message.set('Publish form is invalid.');
-      return;
-    }
-
-    this.loading.set(true);
-    const payload = this.publishOrderForm.getRawValue();
-    this.api.publishOrderEvent(payload).subscribe({
-      next: () => {
-        this.message.set(`Published event for order ${payload.orderId}.`);
-        this.log(`Published manual order event. orderId=${payload.orderId}, status=${payload.status}`);
-      },
-      error: (error) => this.handleError('Failed to publish order event.', error),
-      complete: () => this.loading.set(false)
-    });
-  }
-
-  onInvokeSelf(): void {
-    if (this.invokeForm.invalid) {
-      this.message.set('Invocation message is required.');
-      return;
-    }
-
-    this.loading.set(true);
-    const payload = this.invokeForm.getRawValue();
-    this.api.invokeSelf(payload).subscribe({
-      next: (response) => {
-        this.invokeResult.set(response);
-        this.message.set('Dapr service invocation succeeded.');
-        this.log(`Invoked internal endpoint through Dapr sidecar. message="${payload.message}"`);
-      },
-      error: (error) => this.handleError('Service invocation failed.', error),
+      error: (error) => this.handleError('Failed to load order.', error),
       complete: () => this.loading.set(false)
     });
   }

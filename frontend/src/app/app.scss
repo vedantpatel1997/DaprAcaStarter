@@ -103,7 +103,20 @@ input {
   background: #fff;
 }
 
+select {
+  border: 1px solid #b6c9d3;
+  border-radius: 10px;
+  padding: 0.58rem 0.7rem;
+  font: inherit;
+  background: #fff;
+}
+
 input:focus {
+  outline: 2px solid rgb(15 124 138 / 0.35);
+  border-color: var(--accent);
+}
+
+select:focus {
   outline: 2px solid rgb(15 124 138 / 0.35);
   border-color: var(--accent);
 }

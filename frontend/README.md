@@ -1,39 +1,50 @@
-﻿# Frontend - Dapr Operations Console (Angular 21)
+# Frontend (Angular 21)
 
-This Angular app is a UI companion for the Dapr backend in the repository root.
+This frontend is a workflow UI for the Dapr storefront architecture.
 
-## What It Demonstrates
+## What It Does
 
-- Calling backend service metadata and health endpoints
-- Creating orders (`POST /orders`) to trigger state save + pub/sub publish
-- Reading orders (`GET /orders/{id}`) from Dapr state store
-- Manual publish (`POST /publish/orders`) to Dapr topic
-- Service invocation (`POST /invoke/self`) through Dapr app ID
+- Calls `storefront-api` endpoints.
+- Displays products, cart, order details, metadata, health, and activity logs.
+- Demonstrates user flow:
+  - load products
+  - add item to cart
+  - checkout
+  - verify cart is cleared by pub/sub subscriber
 
-## Prerequisites
+## Runtime API Base URL
 
-- Node.js 22.12.0 or newer
-- Backend running with Dapr sidecar on `http://localhost:8080`
+Default API URL is configured in `src/app/dapr-api.service.ts`.
 
-## Run
+- Local: `http://localhost:8080`
+- Cloud example: `https://storefront-api.blackocean-54455b91.westus2.azurecontainerapps.io`
+
+The UI also allows changing API URL at runtime.
+
+## Commands
 
 ```powershell
 npm install
 npm start
-```
-
-Open `http://localhost:4200`.
-
-## Build
-
-```powershell
 npm run build
 ```
 
 ## Main Files
 
-- `src/app/app.ts`: UI logic and API actions
-- `src/app/dapr-api.service.ts`: typed HTTP integration layer
-- `src/app/models.ts`: backend payload types
-- `src/app/app.html`: operational dashboard UI
-- `src/app/app.scss`: styling
+- `src/app/app.ts`: page behavior and API actions
+- `src/app/dapr-api.service.ts`: typed HTTP client
+- `src/app/models.ts`: frontend models
+- `src/app/app.html`: dashboard template
+- `src/app/app.scss`: styles
+
+## Docker
+
+```powershell
+docker build -t storefront-frontend:local .
+```
+
+Container serves static files via Nginx (`nginx.conf`).
+
+## ACA
+
+Deploy image as a separate container app with external ingress on port `80`.

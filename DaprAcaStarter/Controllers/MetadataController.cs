@@ -15,10 +15,11 @@ public sealed class MetadataController(IAppInfoService appInfoService, ILogger<M
     {
         var serviceInfo = _appInfoService.GetServiceInfo();
         _logger.LogInformation(
-            "Service started. appId={AppId}, stateStore={StateStoreName}, pubsub={PubSubName}, topic={OrdersTopic}",
+            "Service started. appId={AppId}, products={ProductsAppId}, cart={CartAppId}, checkout={CheckoutAppId}, topic={Topic}",
             serviceInfo.AppId,
-            serviceInfo.Dapr.StateStore,
-            serviceInfo.Dapr.Pubsub,
+            serviceInfo.Services.ProductsAppId,
+            serviceInfo.Services.CartAppId,
+            serviceInfo.Services.CheckoutAppId,
             serviceInfo.Dapr.Topic);
 
         return Ok(serviceInfo);

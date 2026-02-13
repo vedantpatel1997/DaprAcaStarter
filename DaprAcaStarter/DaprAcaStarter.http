@@ -1,24 +1,38 @@
-﻿@DaprAcaStarter_HostAddress = http://localhost:8080
+@DaprAcaStarter_HostAddress = http://localhost:8080
 
 ### Health
 GET {{DaprAcaStarter_HostAddress}}/healthz
 Accept: application/json
 
-### Create Order
-POST {{DaprAcaStarter_HostAddress}}/orders
+### Service Metadata
+GET {{DaprAcaStarter_HostAddress}}/
+Accept: application/json
+
+### Get Products (storefront -> products-service)
+GET {{DaprAcaStarter_HostAddress}}/api/products
+Accept: application/json
+
+### Add To Cart (storefront -> cart-service)
+POST {{DaprAcaStarter_HostAddress}}/api/cart/cust-101/items
 Content-Type: application/json
 
 {
-  "customerId": "cust-101",
-  "product": "Laptop Stand",
-  "quantity": 2,
-  "unitPrice": 39.99
+  "productId": "P-400",
+  "productName": "Laptop Stand",
+  "unitPrice": 39.99,
+  "quantity": 2
 }
 
-### Invoke Self Through Dapr
-POST {{DaprAcaStarter_HostAddress}}/invoke/self
+### Checkout (storefront -> checkout-service)
+POST {{DaprAcaStarter_HostAddress}}/api/checkout/cust-101
 Content-Type: application/json
 
-{
-  "message": "hello via dapr invocation"
-}
+{}
+
+### Read Cart
+GET {{DaprAcaStarter_HostAddress}}/api/cart/cust-101
+Accept: application/json
+
+### Load Order By Id
+GET {{DaprAcaStarter_HostAddress}}/api/orders/<ORDER_ID>
+Accept: application/json
