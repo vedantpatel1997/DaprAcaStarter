@@ -1,8 +1,14 @@
 using Dapr.Client;
+using System.Collections.Concurrent;
+using System.Net.Http.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var useDapr = builder.Configuration.GetValue("UseDapr", false);
+var cartServiceBaseUrl = builder.Configuration.GetValue("CartServiceBaseUrl", "http://localhost:8082")!;
+
 builder.Services.AddDaprClient();
+builder.Services.AddHttpClient();
 builder.Services.AddOpenApi();
 
 var app = builder.Build();
@@ -14,22 +20,35 @@ if (app.Environment.IsDevelopment())
 
 const string stateStoreName = "statestore";
 const string checkoutTopic = "checkout.completed.v1";
+var localOrders = new ConcurrentDictionary<string, CheckoutOrder>(StringComparer.OrdinalIgnoreCase);
 
 app.MapGet("/", () => Results.Ok(new
 {
     appId = "checkout-service",
+    mode = useDapr ? "dapr" : "direct",
     message = "Checkout microservice is running",
-    stateStore = stateStoreName,
-    topic = checkoutTopic
+    stateStore = useDapr ? stateStoreName : "in-memory",
+    topic = useDapr ? checkoutTopic : "none"
 }));
 
-app.MapPost("/checkout/{customerId}", async (string customerId, DaprClient daprClient, CancellationToken cancellationToken) =>
+app.MapPost("/checkout/{customerId}", async (string customerId, DaprClient daprClient, IHttpClientFactory httpClientFactory, CancellationToken cancellationToken) =>
 {
-    var cart = await daprClient.InvokeMethodAsync<CartState>(
-        HttpMethod.Get,
-        "cart-service",
-        $"cart/{Uri.EscapeDataString(customerId)}",
-        cancellationToken: cancellationToken);
+    CartState cart;
+    if (useDapr)
+    {
+        cart = await daprClient.InvokeMethodAsync<CartState>(
+            HttpMethod.Get,
+            "cart-service",
+            $"cart/{Uri.EscapeDataString(customerId)}",
+            cancellationToken: cancellationToken);
+    }
+    else
+    {
+        var client = httpClientFactory.CreateClient();
+        var cartResponse = await client.GetAsync($"{cartServiceBaseUrl}/cart/{Uri.EscapeDataString(customerId)}", cancellationToken);
+        cartResponse.EnsureSuccessStatusCode();
+        cart = (await cartResponse.Content.ReadFromJsonAsync<CartState>(cancellationToken))!;
+    }
 
     if (cart.Items.Count == 0)
     {
@@ -46,27 +65,43 @@ app.MapPost("/checkout/{customerId}", async (string customerId, DaprClient daprC
         Status = "Confirmed"
     };
 
-    await daprClient.SaveStateAsync(stateStoreName, BuildOrderKey(order.OrderId), order, cancellationToken: cancellationToken);
-
-    var checkoutEvent = new CheckoutCompletedEvent
+    if (useDapr)
     {
-        OrderId = order.OrderId,
-        CustomerId = order.CustomerId,
-        Total = order.Total,
-        CheckedOutUtc = order.CheckedOutUtc
-    };
+        await daprClient.SaveStateAsync(stateStoreName, BuildOrderKey(order.OrderId), order, cancellationToken: cancellationToken);
 
-    await daprClient.PublishEventAsync("pubsub", checkoutTopic, checkoutEvent, cancellationToken);
+        var checkoutEvent = new CheckoutCompletedEvent
+        {
+            OrderId = order.OrderId,
+            CustomerId = order.CustomerId,
+            Total = order.Total,
+            CheckedOutUtc = order.CheckedOutUtc
+        };
+
+        await daprClient.PublishEventAsync("pubsub", checkoutTopic, checkoutEvent, cancellationToken);
+    }
+    else
+    {
+        localOrders[BuildOrderKey(order.OrderId)] = order;
+        var client = httpClientFactory.CreateClient();
+        await client.DeleteAsync($"{cartServiceBaseUrl}/cart/{Uri.EscapeDataString(customerId)}", cancellationToken);
+    }
 
     return Results.Ok(order);
 });
 
 app.MapGet("/orders/{orderId}", async (string orderId, DaprClient daprClient, CancellationToken cancellationToken) =>
 {
-    var order = await daprClient.GetStateAsync<CheckoutOrder?>(stateStoreName, BuildOrderKey(orderId), cancellationToken: cancellationToken);
-    return order is null
-        ? Results.NotFound(new { message = "Order not found", orderId })
-        : Results.Ok(order);
+    if (useDapr)
+    {
+        var order = await daprClient.GetStateAsync<CheckoutOrder?>(stateStoreName, BuildOrderKey(orderId), cancellationToken: cancellationToken);
+        return order is null
+            ? Results.NotFound(new { message = "Order not found", orderId })
+            : Results.Ok(order);
+    }
+
+    return localOrders.TryGetValue(BuildOrderKey(orderId), out var localOrder)
+        ? Results.Ok(localOrder)
+        : Results.NotFound(new { message = "Order not found", orderId });
 });
 
 app.Run();

@@ -11,6 +11,7 @@ public static class ServiceCollectionExtensions
         services.AddOpenApi();
         services.AddControllers().AddDapr();
         services.AddDaprClient();
+        services.AddHttpClient();
 
         services.AddOptions<DaprOptions>()
             .Bind(configuration.GetSection(DaprOptions.SectionName))

@@ -9,6 +9,8 @@ public sealed class DaprOptions
     [Required]
     public string AppId { get; set; } = DaprDefaults.AppId;
 
+    public bool UseDaprInvocation { get; set; } = DaprDefaults.UseDaprInvocation;
+
     [Required]
     public string StateStoreName { get; set; } = DaprDefaults.StateStoreName;
 
@@ -26,4 +28,13 @@ public sealed class DaprOptions
 
     [Required]
     public string CheckoutAppId { get; set; } = DaprDefaults.CheckoutAppId;
+
+    [Required]
+    public string ProductsBaseUrl { get; set; } = DaprDefaults.ProductsBaseUrl;
+
+    [Required]
+    public string CartBaseUrl { get; set; } = DaprDefaults.CartBaseUrl;
+
+    [Required]
+    public string CheckoutBaseUrl { get; set; } = DaprDefaults.CheckoutBaseUrl;
 }

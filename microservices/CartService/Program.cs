@@ -1,7 +1,10 @@
 using Dapr;
 using Dapr.Client;
+using System.Collections.Concurrent;
 
 var builder = WebApplication.CreateBuilder(args);
+
+var useDapr = builder.Configuration.GetValue("UseDapr", false);
 
 builder.Services.AddDaprClient();
 builder.Services.AddOpenApi();
@@ -13,31 +16,54 @@ if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 }
 
-app.UseCloudEvents();
-app.MapSubscribeHandler();
+if (useDapr)
+{
+    app.UseCloudEvents();
+    app.MapSubscribeHandler();
+}
 
 const string stateStoreName = "statestore";
+var localCartStore = new ConcurrentDictionary<string, CartState>(StringComparer.OrdinalIgnoreCase);
 
 app.MapGet("/", () => Results.Ok(new
 {
     appId = "cart-service",
+    mode = useDapr ? "dapr" : "direct",
     message = "Cart microservice is running",
-    stateStore = stateStoreName,
-    subscriptions = new[] { "checkout.completed.v1" }
+    stateStore = useDapr ? stateStoreName : "in-memory",
+    subscriptions = useDapr ? new[] { "checkout.completed.v1" } : Array.Empty<string>()
 }));
 
 app.MapGet("/cart/{customerId}", async (string customerId, DaprClient daprClient, CancellationToken cancellationToken) =>
 {
-    var key = BuildCartKey(customerId);
-    var cart = await daprClient.GetStateAsync<CartState?>(stateStoreName, key, cancellationToken: cancellationToken);
-    return Results.Ok(cart ?? new CartState(customerId, []));
+    if (useDapr)
+    {
+        var key = BuildCartKey(customerId);
+        var cart = await daprClient.GetStateAsync<CartState?>(stateStoreName, key, cancellationToken: cancellationToken);
+        return Results.Ok(cart ?? new CartState(customerId, []));
+    }
+
+    return Results.Ok(localCartStore.TryGetValue(BuildCartKey(customerId), out var localCart)
+        ? localCart
+        : new CartState(customerId, []));
 });
 
 app.MapPost("/cart/{customerId}/items", async (string customerId, AddCartItemRequest request, DaprClient daprClient, CancellationToken cancellationToken) =>
 {
     var key = BuildCartKey(customerId);
-    var cart = await daprClient.GetStateAsync<CartState?>(stateStoreName, key, cancellationToken: cancellationToken)
-        ?? new CartState(customerId, []);
+
+    CartState cart;
+    if (useDapr)
+    {
+        cart = await daprClient.GetStateAsync<CartState?>(stateStoreName, key, cancellationToken: cancellationToken)
+            ?? new CartState(customerId, []);
+    }
+    else
+    {
+        cart = localCartStore.TryGetValue(key, out var localCart)
+            ? localCart
+            : new CartState(customerId, []);
+    }
 
     var existing = cart.Items.FirstOrDefault(item => item.ProductId.Equals(request.ProductId, StringComparison.OrdinalIgnoreCase));
     if (existing is null)
@@ -49,24 +75,44 @@ app.MapPost("/cart/{customerId}/items", async (string customerId, AddCartItemReq
         existing.Quantity += request.Quantity;
     }
 
-    await daprClient.SaveStateAsync(stateStoreName, key, cart, cancellationToken: cancellationToken);
+    if (useDapr)
+    {
+        await daprClient.SaveStateAsync(stateStoreName, key, cart, cancellationToken: cancellationToken);
+    }
+    else
+    {
+        localCartStore[key] = cart;
+    }
+
     return Results.Ok(cart);
 });
 
 app.MapDelete("/cart/{customerId}", async (string customerId, DaprClient daprClient, CancellationToken cancellationToken) =>
 {
-    await daprClient.DeleteStateAsync(stateStoreName, BuildCartKey(customerId), cancellationToken: cancellationToken);
+    var key = BuildCartKey(customerId);
+    if (useDapr)
+    {
+        await daprClient.DeleteStateAsync(stateStoreName, key, cancellationToken: cancellationToken);
+    }
+    else
+    {
+        localCartStore.TryRemove(key, out _);
+    }
+
     return Results.NoContent();
 });
 
-app.MapPost("/checkout-events", async (CheckoutCompletedEvent evt, DaprClient daprClient, ILoggerFactory loggerFactory, CancellationToken cancellationToken) =>
+if (useDapr)
 {
-    var logger = loggerFactory.CreateLogger("CheckoutEventHandler");
-    await daprClient.DeleteStateAsync(stateStoreName, BuildCartKey(evt.CustomerId), cancellationToken: cancellationToken);
-    logger.LogInformation("Cleared cart for customer {CustomerId} after checkout order {OrderId}", evt.CustomerId, evt.OrderId);
-    return Results.Ok();
-})
-.WithTopic("pubsub", "checkout.completed.v1");
+    app.MapPost("/checkout-events", async (CheckoutCompletedEvent evt, DaprClient daprClient, ILoggerFactory loggerFactory, CancellationToken cancellationToken) =>
+    {
+        var logger = loggerFactory.CreateLogger("CheckoutEventHandler");
+        await daprClient.DeleteStateAsync(stateStoreName, BuildCartKey(evt.CustomerId), cancellationToken: cancellationToken);
+        logger.LogInformation("Cleared cart for customer {CustomerId} after checkout order {OrderId}", evt.CustomerId, evt.OrderId);
+        return Results.Ok();
+    })
+    .WithTopic("pubsub", "checkout.completed.v1");
+}
 
 app.Run();
 
