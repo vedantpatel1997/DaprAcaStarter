@@ -1,118 +1,232 @@
-﻿# Dapr ACA Starter (.NET 10)
+# Dapr ACA Starter (.NET 10 + Angular 21)
 
-This project is a minimal ASP.NET Core service that demonstrates core Dapr building blocks and how the same app can run locally and in Azure Container Apps (ACA) with Dapr enabled.
+This repository demonstrates a local Dapr-based microservice workflow with:
 
-## What This Project Is Doing
+- Backend API: `DaprAcaStarter` (ASP.NET Core + Dapr SDK)
+- Frontend UI: `frontend` (Angular)
+- Infrastructure dependency: Redis (state store + pub/sub broker)
 
-The service exposes HTTP endpoints for a simple `Order` workflow and uses Dapr for:
+The project is designed for local development with:
 
-- State management (`statestore`) to persist orders
-- Pub/Sub (`pubsub`) to publish and consume order events
-- Service invocation to call an internal endpoint via Dapr app ID
+- Visual Studio for backend code/debugging
+- VS Code for frontend development
+- Docker Desktop for Redis
+- Dapr sidecar running locally
 
-It is a starter template for event-driven microservices patterns, not a full production system.
+## Architecture Overview
 
-## How It Works Overall
+### Backend (`DaprAcaStarter`)
 
-1. Client calls `POST /orders`.
-2. App creates an order ID and writes the order to Dapr state store (`statestore`).
-3. App publishes the order to Dapr topic `orders.v1` on component `pubsub`.
-4. Dapr routes that event back to the app subscription endpoint `POST /dapr/orders-subscription`.
-5. You can fetch the stored order with `GET /orders/{id}`.
-6. You can test Dapr service invocation with `POST /invoke/self`, which calls `internal/echo` through Dapr by app ID (`dapr-aca-starter`).
+- `Controllers/`: HTTP endpoints and Dapr subscription handlers
+- `Services/`: business logic for state, pub/sub, and service invocation
+- `Models/`: request/response contracts and entities
+- `Configuration/`: Dapr option defaults and binding models
+- `Extensions/`: DI registration and HTTP pipeline setup
+- `components/`: Dapr component manifests (`statestore`, `pubsub`)
 
-## Architecture (Local)
+### Frontend (`frontend`)
 
-- App: ASP.NET Core minimal API on port `8080`
-- Dapr sidecar: started by `dapr run`, HTTP API on `3500`
-- Backend for Dapr components: local Redis (`localhost:6379`)
+- Angular UI for invoking backend APIs
+- Default backend URL in UI service: `http://localhost:8080`
+- Can be changed from the UI/API base URL input at runtime
 
-`components/statestore.yaml` and `components/pubsub.yaml` both point to local Redis.
+## What This Project Demonstrates
 
-## API Endpoints
+- Dapr state management using Redis component `statestore`
+- Dapr pub/sub using Redis component `pubsub` and topic `orders.v1`
+- Dapr service invocation using app ID `dapr-aca-starter`
+- Dapr subscription handling via `[Topic(...)]` endpoint
 
-- `GET /` service info
-- `GET /healthz` health check
-- `POST /orders` create order, save state, publish event
-- `GET /orders/{id}` read order from state store
-- `POST /publish/orders` manual event publish
-- `POST /dapr/orders-subscription` event subscriber endpoint
-- `POST /internal/echo` internal endpoint (invoked through Dapr)
-- `POST /invoke/self` trigger Dapr service invocation call
+## Local API Endpoints
 
-## Use Cases
-
-- Learn Dapr fundamentals in one service
-- Validate local-to-cloud parity (same app model on ACA)
-- Prototype event-driven order or workflow services
-- Baseline for splitting into multiple services later (order, inventory, shipping, notifications)
+- `GET /`
+- `GET /healthz`
+- `POST /orders`
+- `GET /orders/{id}`
+- `POST /publish/orders`
+- `POST /dapr/orders-subscription`
+- `POST /internal/echo`
+- `POST /invoke/self`
 
 ## Prerequisites
 
-- .NET SDK 10.0+
-- Dapr CLI (initialized via `dapr init`)
-- Docker Desktop
-- Redis (local)
+Install and verify:
 
-## Run Locally
+- .NET SDK 10.x
+- Node.js 22.12.0+
+- npm 10.9.0+
+- Docker Desktop (running)
+- Dapr CLI + runtime (`dapr init` done)
 
-From project root:
+Verification commands:
 
 ```powershell
-# Start Redis
-docker run --name dapr-redis -d -p 6379:6379 redis:7
+dotnet --list-sdks
+node -v
+npm -v
+docker --version
+dapr --version
+```
 
-# Run app + Dapr sidecar
+## First-Time Setup
+
+### 1) Start Redis container
+
+```powershell
+docker run --name dapr-redis -d -p 6379:6379 redis:7
+```
+
+If container already exists:
+
+```powershell
+docker start dapr-redis
+```
+
+### 2) Install frontend dependencies
+
+```powershell
+cd frontend
+npm install
+```
+
+## Run Modes
+
+## Mode A: Full Terminal Run (quickest, no IDE dependency)
+
+Use this when you want everything aligned to backend `8080` (frontend default).
+
+### Terminal 1: Backend + Dapr sidecar
+
+```powershell
+cd DaprAcaStarter
 dapr run --app-id dapr-aca-starter --app-port 8080 --dapr-http-port 3500 --resources-path ./components -- dotnet run --urls http://localhost:8080
 ```
 
-OpenAPI document in development:
-- `http://localhost:8080/openapi/v1.json`
-
-## Quick Test
+### Terminal 2: Frontend
 
 ```powershell
-# Health
-curl http://localhost:8080/healthz
-
-# Create order
-curl -X POST http://localhost:8080/orders -H "Content-Type: application/json" -d '{"customerId":"cust-101","product":"Laptop Stand","quantity":2,"unitPrice":39.99}'
-
-# Read order
-curl http://localhost:8080/orders/<ORDER_ID>
-
-# Manual publish
-curl -X POST http://localhost:8080/publish/orders -H "Content-Type: application/json" -d '{"orderId":"<ORDER_ID>","status":"Shipped"}'
-
-# Service invocation via Dapr
-curl -X POST http://localhost:8080/invoke/self -H "Content-Type: application/json" -d '{"message":"hello via dapr invocation"}'
+cd frontend
+npm start
 ```
 
-## Deploy To Azure Container Apps
+Open `http://localhost:4200`.
 
-`aca/containerapp.dapr.yaml` contains a sample ACA manifest with Dapr enabled.
+## Mode B: Visual Studio (backend) + VS Code (frontend)
 
-1. Build and push image:
+Use this when you want debugging in Visual Studio.
+
+By default Visual Studio launch profile runs backend on `http://localhost:5002`.
+
+### Terminal 1: Start Dapr sidecar only
 
 ```powershell
-docker build -t <ACR_LOGIN_SERVER>/dapr-aca-starter:latest .
-docker push <ACR_LOGIN_SERVER>/dapr-aca-starter:latest
+cd DaprAcaStarter
+dapr run --app-id dapr-aca-starter --app-port 5002 --dapr-http-port 3500 --resources-path ./components
 ```
 
-2. Update placeholders in `aca/containerapp.dapr.yaml`:
-- `<SUBSCRIPTION_ID>`
-- `<RESOURCE_GROUP>`
-- `<ACA_ENV_NAME>`
-- `<ACR_LOGIN_SERVER>`
+### Visual Studio: Start backend app
 
-3. Deploy with Azure CLI using the YAML.
+1. Open `Dapr ACA.sln`
+2. Select launch profile `http`
+3. Press `F5`
 
-4. For cloud components, replace local Redis-based Dapr components with managed services (for example Azure Service Bus, Azure Cache for Redis, Cosmos DB, or Blob Storage as appropriate).
+### VS Code / Terminal 2: Start frontend
 
-## Important Files
+```powershell
+cd frontend
+npm start
+```
 
-- `Program.cs` application endpoints and Dapr integration
-- `components/statestore.yaml` local state store component
-- `components/pubsub.yaml` local pub/sub component
-- `aca/containerapp.dapr.yaml` ACA deployment manifest with Dapr config
-- `Dockerfile` container build for ACA
+Open `http://localhost:4200`.
+
+Important: set frontend API base URL to `http://localhost:5002` (UI default is `http://localhost:8080`).
+
+## Dapr Flow (End-to-End)
+
+This is the runtime flow when you create an order from frontend:
+
+1. Frontend sends `POST /orders` to backend API.
+2. `OrdersController` calls `OrderService.CreateOrderAsync`.
+3. `OrderService` writes order state via Dapr SDK:
+   - `SaveStateAsync("statestore", orderId, order)`
+4. Dapr sidecar resolves `statestore` from `components/statestore.yaml`.
+5. Dapr component writes data to Redis (`localhost:6379`).
+6. `OrderService` publishes event via Dapr SDK:
+   - `PublishEventAsync("pubsub", "orders.v1", order)`
+7. Dapr sidecar resolves `pubsub` from `components/pubsub.yaml`.
+8. Redis pub/sub carries the message.
+9. Dapr discovers backend subscription via `/dapr/subscribe` (enabled by `MapSubscribeHandler`).
+10. Dapr delivers topic message to:
+    - `POST /dapr/orders-subscription`
+11. `SubscriptionController` handles message and logs receipt.
+12. API returns created order response to frontend.
+
+### Service Invocation Flow
+
+When frontend calls `POST /invoke/self`:
+
+1. `InvocationController` calls `InvocationService.InvokeSelfAsync`.
+2. Service uses Dapr SDK `InvokeMethodAsync` with app ID `dapr-aca-starter`.
+3. Dapr sidecar resolves target app by app ID.
+4. Sidecar invokes backend endpoint `POST /internal/echo`.
+5. Echo response is returned back through Dapr to caller.
+
+## Dapr Component Files
+
+- `components/statestore.yaml`
+  - `type: state.redis`
+  - `name: statestore`
+  - `redisHost: localhost:6379`
+
+- `components/pubsub.yaml`
+  - `type: pubsub.redis`
+  - `name: pubsub`
+  - `redisHost: localhost:6379`
+
+## Health and Validation Checklist
+
+After startup, verify in this order:
+
+1. Backend metadata:
+```powershell
+Invoke-RestMethod http://localhost:8080/
+```
+(or `http://localhost:5002/` in Mode B)
+
+2. Health:
+```powershell
+Invoke-RestMethod http://localhost:8080/healthz
+```
+
+3. Create order (example):
+```powershell
+$order = Invoke-RestMethod -Method Post -Uri http://localhost:8080/orders -ContentType "application/json" -Body '{"customerId":"C-100","product":"Keyboard","quantity":1,"unitPrice":99.0}'
+$order
+```
+
+4. Read order:
+```powershell
+Invoke-RestMethod "http://localhost:8080/orders/$($order.id)"
+```
+
+## Troubleshooting
+
+- `Error: connection refused localhost:6379`
+  - Redis container is not running. Run `docker start dapr-redis`.
+
+- Frontend cannot call backend (CORS/network error)
+  - Check backend port:
+    - Mode A: `8080`
+    - Mode B: `5002`
+  - Ensure frontend API base URL matches backend URL.
+
+- Dapr pub/sub or state not working
+  - Ensure `dapr run` used `--resources-path ./components` from `DaprAcaStarter` directory.
+  - Confirm sidecar logs show components loaded.
+
+- Port already in use
+  - Stop old processes/containers or change ports in command.
+
+## Notes for ACA Deployment
+
+The project includes `aca/containerapp.dapr.yaml` as a starting point for Azure Container Apps Dapr configuration. Local development in this README is self-hosted Dapr mode.

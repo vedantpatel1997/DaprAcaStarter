@@ -1,0 +1,7 @@
+componentType: pubsub.redis
+version: v1
+metadata:
+- name: redisHost
+  value: ca-dapr-aca-redis:6379
+scopes:
+- dapr-aca-starter

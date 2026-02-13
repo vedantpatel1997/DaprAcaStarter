@@ -1,0 +1,9 @@
+componentType: state.redis
+version: v1
+metadata:
+- name: redisHost
+  value: ca-dapr-aca-redis:6379
+- name: actorStateStore
+  value: "false"
+scopes:
+- dapr-aca-starter
