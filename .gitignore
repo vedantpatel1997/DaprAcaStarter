@@ -1,18 +1,28 @@
-﻿.vs/
-bin/
-obj/
+.vs/
 *.user
 *.suo
 *.userosscache
 *.sln.docstates
-
-# Rider
 .idea/
-
-# VS Code
 .vscode/
-node_modules/
-
-# OS
 .DS_Store
 Thumbs.db
+
+# .NET
+**/bin/
+**/obj/
+
+# Frontend (Angular)
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/cache/
+frontend/tmp/
+frontend/out-tsc/
+frontend/bazel-out/
+frontend/coverage/
+frontend/.sass-cache/
+frontend/connect.lock
+frontend/libpeerconnection.log
+frontend/testem.log
+frontend/typings/
+frontend/__screenshots__/

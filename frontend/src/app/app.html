@@ -1,0 +1,137 @@
+﻿<main class="page">
+  <section class="hero">
+    <p class="badge">Angular 21 + Dapr + ACA</p>
+    <h1>Dapr Operations Console</h1>
+    <p>
+      This UI calls your backend endpoints directly and helps you understand how
+      state store, pub/sub, and service invocation behave together in one flow.
+    </p>
+  </section>
+
+  <section class="panel">
+    <h2>Connection</h2>
+    <p class="panel-copy">
+      Point the frontend to your backend base URL. For local run, keep
+      <code>http://localhost:8080</code>.
+    </p>
+    <div class="grid">
+      <label class="field field-wide">
+        <span>Backend URL</span>
+        <input [formControl]="apiBaseUrl" placeholder="http://localhost:8080" />
+      </label>
+      <button type="button" (click)="onApplyApiBaseUrl()">Apply</button>
+      <button type="button" (click)="onLoadServiceInfo()">Load Service Info</button>
+      <button type="button" (click)="onHealthCheck()">Health Check</button>
+    </div>
+    <p class="status">{{ message() }}</p>
+  </section>
+
+  <section class="panel">
+    <h2>Dapr Flow Explorer</h2>
+    <div class="steps">
+      <article>
+        <h3>1. State Store</h3>
+        <p><code>POST /orders</code> saves an order to <code>statestore</code>.</p>
+      </article>
+      <article>
+        <h3>2. Pub/Sub</h3>
+        <p>The same call also publishes to topic <code>orders.v1</code> on <code>pubsub</code>.</p>
+      </article>
+      <article>
+        <h3>3. Subscription</h3>
+        <p>Dapr delivers events to backend endpoint <code>/dapr/orders-subscription</code>.</p>
+      </article>
+      <article>
+        <h3>4. Invocation</h3>
+        <p><code>POST /invoke/self</code> shows service-to-service call through Dapr app ID.</p>
+      </article>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Create Order</h2>
+    <form [formGroup]="createOrderForm" class="grid">
+      <label class="field">
+        <span>Customer ID</span>
+        <input formControlName="customerId" />
+      </label>
+      <label class="field">
+        <span>Product</span>
+        <input formControlName="product" />
+      </label>
+      <label class="field">
+        <span>Quantity</span>
+        <input type="number" min="1" formControlName="quantity" />
+      </label>
+      <label class="field">
+        <span>Unit Price</span>
+        <input type="number" step="0.01" min="0.01" formControlName="unitPrice" />
+      </label>
+      <button type="button" (click)="onCreateOrder()" [disabled]="loading()">Create + Publish</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Read Order From State Store</h2>
+    <form [formGroup]="getOrderForm" class="grid">
+      <label class="field field-wide">
+        <span>Order ID</span>
+        <input formControlName="orderId" placeholder="Paste order id from create step" />
+      </label>
+      <button type="button" (click)="onGetOrder()" [disabled]="loading()">Fetch Order</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Manual Pub/Sub Event</h2>
+    <form [formGroup]="publishOrderForm" class="grid">
+      <label class="field">
+        <span>Order ID</span>
+        <input formControlName="orderId" />
+      </label>
+      <label class="field">
+        <span>Status</span>
+        <input formControlName="status" />
+      </label>
+      <button type="button" (click)="onPublishEvent()" [disabled]="loading()">Publish Event</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Dapr Service Invocation</h2>
+    <form [formGroup]="invokeForm" class="grid">
+      <label class="field field-wide">
+        <span>Message</span>
+        <input formControlName="message" />
+      </label>
+      <button type="button" (click)="onInvokeSelf()" [disabled]="loading()">Invoke Self</button>
+    </form>
+  </section>
+
+  <section class="panel">
+    <h2>Live Output</h2>
+    <div class="two-col">
+      <article>
+        <h3>Service Metadata</h3>
+        <pre>{{ serviceInfo() | json }}</pre>
+        <h3>Health</h3>
+        <pre>{{ healthInfo() | json }}</pre>
+      </article>
+      <article>
+        <h3>Selected Order</h3>
+        <pre>{{ selectedOrder() | json }}</pre>
+        <h3>Invocation Result</h3>
+        <pre>{{ invokeResult() | json }}</pre>
+      </article>
+    </div>
+  </section>
+
+  <section class="panel">
+    <h2>Recent Activity</h2>
+    <ul class="activity">
+      @for (entry of activity(); track entry) {
+        <li>{{ entry }}</li>
+      }
+    </ul>
+  </section>
+</main>

@@ -1,0 +1,18 @@
+﻿.vs/
+bin/
+obj/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
